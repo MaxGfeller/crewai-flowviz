@@ -115,9 +115,10 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
       background: #111418;
       color: #eef2f5;
     }}
-    body {{ margin: 0; min-height: 100vh; display: grid; grid-template-columns: 320px 1fr; }}
-    aside {{ border-right: 1px solid #2a323a; padding: 18px; background: #151a20; overflow: auto; }}
-    main {{ overflow: auto; background: #20262c; }}
+    html, body {{ height: 100%; }}
+    body {{ margin: 0; height: 100vh; overflow: hidden; display: grid; grid-template-columns: 320px minmax(0, 1fr); }}
+    aside {{ height: 100vh; box-sizing: border-box; border-right: 1px solid #2a323a; padding: 18px; background: #151a20; overflow: auto; }}
+    main {{ height: 100vh; min-width: 0; min-height: 0; overflow: auto; background: #20262c; }}
     h1 {{ font-size: 18px; line-height: 1.25; margin: 0 0 18px; }}
     label {{ display: grid; gap: 6px; font-size: 12px; color: #aeb8c2; margin: 0 0 14px; }}
     input, select {{ border: 1px solid #3a4650; border-radius: 6px; background: #0f1318; color: #eef2f5; padding: 8px 9px; font: inherit; }}
@@ -127,7 +128,7 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
     .buttons {{ display: flex; gap: 8px; margin-top: 18px; }}
     button, a.button {{ border: 0; border-radius: 6px; background: #ff665c; color: white; padding: 9px 11px; text-decoration: none; font-weight: 700; cursor: pointer; }}
     a.button.secondary {{ background: #33404b; }}
-    #canvas {{ min-width: 100%; min-height: 100%; display: grid; place-items: start center; padding: 24px; box-sizing: border-box; }}
+    #canvas {{ width: max-content; min-width: 100%; min-height: 100%; display: grid; place-items: start center; padding: 24px; box-sizing: border-box; }}
     #canvas svg {{ max-width: none; background: white; box-shadow: 0 20px 70px rgba(0,0,0,.35); }}
     .meta {{ color: #7f8a94; font-size: 12px; margin-bottom: 18px; }}
   </style>
