@@ -5,12 +5,11 @@ description = "Configurable static and interactive visualizations for CrewAI Flo
 readme = "README.md"
 authors = [{ name = "Max Gfeller" }]
 requires-python = ">=3.10,<3.14"
-dependencies = []
+dependencies = ["pillow>=10.0"]
 
 [project.optional-dependencies]
-png = ["cairosvg>=2.7"]
 crewai = ["crewai>=1.9"]
-dev = ["pytest>=8.0", "cairosvg>=2.7"]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
 crewai-flowviz = "crewai_flowviz.cli:main"

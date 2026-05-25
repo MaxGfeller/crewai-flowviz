@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from crewai_flowviz.models import FlowGraph, RenderConfig, Theme
+from crewai_flowviz.png import render_png_bytes
 from crewai_flowviz.svg import render_svg
 
 
@@ -49,12 +50,7 @@ def write_output(
     elif fmt == "dot":
         output.write_text(render_dot(graph), encoding="utf-8")
     elif fmt == "png":
-        svg = render_svg(graph, config, theme)
-        try:
-            import cairosvg
-        except ImportError as exc:
-            raise RuntimeError("PNG output requires the optional 'png' extra: pip install crewai-flowviz[png]") from exc
-        cairosvg.svg2png(bytestring=svg.encode("utf-8"), write_to=str(output))
+        output.write_bytes(render_png_bytes(graph, config, theme))
     else:
         raise ValueError(f"unsupported format: {fmt}")
     return output

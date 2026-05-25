@@ -79,6 +79,7 @@ def _render_args(parser: argparse.ArgumentParser, *, output: bool = True) -> Non
     parser.add_argument("--no-grid", action="store_true")
     parser.add_argument("--no-edge-labels", action="store_true")
     parser.add_argument("--source-refs", action="store_true")
+    parser.add_argument("--transparent", action="store_true", help="Export without the theme background color")
 
 
 def _prepare_import(args: argparse.Namespace) -> None:
@@ -118,6 +119,8 @@ def _config(args: argparse.Namespace) -> tuple[RenderConfig, dict[str, object]]:
         values["show_edge_labels"] = False
     if getattr(args, "source_refs", False):
         values["show_source_refs"] = True
+    if getattr(args, "transparent", False):
+        values["export_background"] = False
     return replace(config, **values), theme_overrides
 
 

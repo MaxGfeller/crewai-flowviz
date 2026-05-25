@@ -116,6 +116,7 @@ class RenderConfig:
     show_edge_labels: bool = True
     show_source_refs: bool = False
     show_grid: bool = True
+    export_background: bool = True
     fit: bool = True
     title: str | None = None
     theme: str = "crew"

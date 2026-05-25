@@ -7,9 +7,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 import webbrowser
 
+from crewai_flowviz.exporters import render_png_bytes
 from crewai_flowviz.models import FlowGraph, RenderConfig
 from crewai_flowviz.svg import render_svg
-from crewai_flowviz.themes import list_themes
+from crewai_flowviz.themes import get_theme, list_themes
 
 
 def serve_studio(
@@ -34,6 +35,16 @@ def serve_studio(
                 if parsed.path == "/download.svg":
                     headers["Content-Disposition"] = f'attachment; filename="{graph.name}.svg"'
                 self._send("image/svg+xml; charset=utf-8", svg.encode("utf-8"), headers=headers)
+                return
+            if parsed.path == "/download.png":
+                cfg = _config_from_query(config, parse_qs(parsed.query))
+                theme = get_theme(cfg.theme, theme_overrides)
+                png = render_png_bytes(graph, cfg, theme)
+                self._send(
+                    "image/png",
+                    png,
+                    headers={"Content-Disposition": f'attachment; filename="{graph.name}.png"'},
+                )
                 return
             self.send_error(404)
 
@@ -90,6 +101,7 @@ def _config_from_query(config: RenderConfig, query: dict[str, list[str]]) -> Ren
     values["show_grid"] = query.get("grid", ["1"])[0] == "1"
     values["show_edge_labels"] = query.get("labels", ["1"])[0] == "1"
     values["show_source_refs"] = query.get("sources", ["0"])[0] == "1"
+    values["export_background"] = query.get("background", ["1"])[0] == "1"
     return replace(config, **values)
 
 
@@ -125,11 +137,22 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
     input[type="checkbox"] {{ width: 18px; height: 18px; }}
     .check {{ display: flex; align-items: center; gap: 9px; margin-bottom: 12px; color: #d8e0e7; font-size: 13px; }}
     .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-    .buttons {{ display: flex; gap: 8px; margin-top: 18px; }}
+    .buttons {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }}
     button, a.button {{ border: 0; border-radius: 6px; background: #ff665c; color: white; padding: 9px 11px; text-decoration: none; font-weight: 700; cursor: pointer; }}
     a.button.secondary {{ background: #33404b; }}
     #canvas {{ width: max-content; min-width: 100%; min-height: 100%; display: grid; place-items: start center; padding: 24px; box-sizing: border-box; }}
-    #canvas svg {{ max-width: none; background: white; box-shadow: 0 20px 70px rgba(0,0,0,.35); }}
+    #canvas svg {{
+      max-width: none;
+      background-color: white;
+      background-image:
+        linear-gradient(45deg, rgba(0,0,0,.08) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(0,0,0,.08) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(0,0,0,.08) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(0,0,0,.08) 75%);
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-size: 16px 16px;
+      box-shadow: 0 20px 70px rgba(0,0,0,.35);
+    }}
     .meta {{ color: #7f8a94; font-size: 12px; margin-bottom: 18px; }}
   </style>
 </head>
@@ -150,14 +173,16 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
     <label class="check"><input id="grid" type="checkbox" checked> Grid</label>
     <label class="check"><input id="labels" type="checkbox" checked> Edge labels</label>
     <label class="check"><input id="sources" type="checkbox"> Source refs</label>
+    <label class="check"><input id="background" type="checkbox" checked> Export background color</label>
     <div class="buttons">
       <button id="refresh">Refresh</button>
       <a class="button secondary" id="download" href="/download.svg">Download SVG</a>
+      <a class="button secondary" id="download-png" href="/download.png">Download PNG</a>
     </div>
   </aside>
   <main><div id="canvas"></div></main>
   <script>
-    const ids = ["theme","direction","width","height","node_width","rank_gap","node_gap","margin","grid","labels","sources"];
+    const ids = ["theme","direction","width","height","node_width","rank_gap","node_gap","margin","grid","labels","sources","background"];
     const sliderIds = ["node_width","rank_gap","node_gap","margin"];
     function params() {{
       const q = new URLSearchParams();
@@ -174,6 +199,7 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
       const res = await fetch("/svg?" + q);
       document.getElementById("canvas").innerHTML = await res.text();
       document.getElementById("download").href = "/download.svg?" + q;
+      document.getElementById("download-png").href = "/download.png?" + q;
     }}
     for (const id of ids) document.getElementById(id).addEventListener("input", refresh);
     document.getElementById("refresh").addEventListener("click", refresh);

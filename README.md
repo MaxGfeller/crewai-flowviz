@@ -16,6 +16,7 @@ rm -rf .venv
 ```bash
 crewai-flowviz render package.module:MyFlow --out flow.svg
 crewai-flowviz render package.module:MyFlow --out flow.png --width 1800 --theme slate
+crewai-flowviz render package.module:MyFlow --out flow.png --transparent
 crewai-flowviz render package.module:MyFlow --out flow.svg --direction horizontal --height 900
 crewai-flowviz studio package.module:MyFlow
 ```
@@ -29,11 +30,9 @@ crewai-flowviz render examples.branching_flow:BranchingSupportFlow \
   --config examples/config.toml
 ```
 
-PNG output requires the optional extra:
-
-```bash
-pip install "crewai-flowviz[png]"
-```
+PNG export is available from both the CLI and the studio. Use `--transparent`
+or turn off "Export background color" in the studio to leave the SVG/PNG
+background transparent.
 
 ## Configuration
 
@@ -49,6 +48,7 @@ rank_gap = 140
 node_gap = 70
 title = "Support Flow"
 show_source_refs = true
+export_background = false
 
 [theme]
 edge_back = "#e11d48"

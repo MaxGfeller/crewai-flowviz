@@ -26,8 +26,9 @@ def render_svg(
         '<?xml version="1.0" encoding="UTF-8"?>',
         _svg_open(width, height, layout, config),
         _defs(theme),
-        f'<rect width="100%" height="100%" fill="{theme.background}"/>',
     ]
+    if config.export_background:
+        parts.append(f'<rect width="100%" height="100%" fill="{theme.background}"/>')
     if config.show_grid:
         parts.append(_grid(layout, theme))
     if config.title:

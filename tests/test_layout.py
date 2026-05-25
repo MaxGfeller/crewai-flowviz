@@ -38,3 +38,16 @@ def test_horizontal_layout_sets_requested_dimension():
 
     assert 'width="1200"' in svg
     assert 'viewBox="' in svg
+
+
+def test_svg_can_omit_background_for_transparent_exports():
+    graph = FlowGraph(
+        name="Transparent",
+        nodes=[Node("a", "a", "start")],
+        edges=[],
+        start_nodes=["a"],
+    )
+
+    svg = render_svg(graph, RenderConfig(export_background=False, show_grid=False))
+
+    assert '<rect width="100%" height="100%"' not in svg
