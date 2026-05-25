@@ -1,0 +1,27 @@
+[project]
+name = "crewai-flowviz"
+version = "0.1.0"
+description = "Configurable static and interactive visualizations for CrewAI Flows"
+readme = "README.md"
+authors = [{ name = "Max Gfeller" }]
+requires-python = ">=3.10,<3.14"
+dependencies = []
+
+[project.optional-dependencies]
+png = ["cairosvg>=2.7"]
+crewai = ["crewai>=1.9"]
+dev = ["pytest>=8.0", "cairosvg>=2.7"]
+
+[project.scripts]
+crewai-flowviz = "crewai_flowviz.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crewai_flowviz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

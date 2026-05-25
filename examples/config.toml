@@ -1,0 +1,12 @@
+[render]
+theme = "crew"
+direction = "vertical"
+width = 1600
+node_width = 300
+rank_gap = 140
+node_gap = 70
+title = "Support Flow"
+show_source_refs = true
+
+[theme]
+edge_back = "#e11d48"
