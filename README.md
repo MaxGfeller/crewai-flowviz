@@ -2,16 +2,56 @@
 
 Configurable static and interactive diagrams for CrewAI Flows.
 
-This is a standalone package draft. It extracts a CrewAI Flow into a stable graph model, then renders SVG/PNG/JSON/DOT from that model. It also includes a tiny local studio for trying themes, orientation, spacing, and dimensions without changing code.
+It extracts a CrewAI Flow into a stable graph model, then renders SVG/PNG/JSON/DOT from that model. It also includes a local studio for trying themes, orientation, spacing, and dimensions without changing code.
 
-## CLI
+## Installation
 
 For now, use Python 3.10-3.13. CrewAI's dependency stack currently fails under Python 3.14 in local `uv --with crewai` runs.
+
+For a CrewAI project, install it as a dev dependency:
+
+```bash
+uv add --dev crewai-flowviz
+```
+
+Then run it inside that project environment:
+
+```bash
+uv run crewai-flowviz studio package.module:MyFlow
+uv run crewai-flowviz render package.module:MyFlow --out artifacts/flow.svg
+uv run crewai-flowviz render package.module:MyFlow --out artifacts/flow.png --transparent
+```
+
+For a one-off run without adding it to the project:
+
+```bash
+uvx --from crewai-flowviz --with-editable . crewai-flowviz studio package.module:MyFlow
+```
+
+For an unpackaged `src/` layout:
+
+```bash
+uvx --from crewai-flowviz --with crewai crewai-flowviz render \
+  package.module:MyFlow \
+  --pythonpath src \
+  --out artifacts/flow.svg
+```
+
+## Local Development
 
 ```bash
 uv python pin 3.13
 rm -rf .venv
 ```
+
+Run the included example:
+
+```bash
+PYTHONPATH=src:examples uv run --with crewai python -m crewai_flowviz.cli studio \
+  branching_flow:BranchingSupportFlow
+```
+
+## CLI
 
 ```bash
 crewai-flowviz render package.module:MyFlow --out flow.svg
@@ -19,15 +59,6 @@ crewai-flowviz render package.module:MyFlow --out flow.png --width 1800 --theme 
 crewai-flowviz render package.module:MyFlow --out flow.png --transparent
 crewai-flowviz render package.module:MyFlow --out flow.svg --direction horizontal --height 900
 crewai-flowviz studio package.module:MyFlow
-```
-
-If the Flow package is not installed, point the importer at it:
-
-```bash
-crewai-flowviz render examples.branching_flow:BranchingSupportFlow \
-  --pythonpath examples \
-  --out artifacts/branching.svg \
-  --config examples/config.toml
 ```
 
 PNG export is available from both the CLI and the studio. Use `--transparent`
@@ -62,4 +93,16 @@ Built-in themes: `crew`, `slate`, `mono`, `mint`.
 - Falls back to private Flow metadata for older CrewAI versions.
 - Treats retry router paths as back edges, so forward execution remains readable.
 - Does not require Graphviz.
-- Static SVG is the canonical renderer. PNG is derived from SVG when `cairosvg` is installed.
+- Static SVG is the canonical vector renderer. PNG is rendered natively with Pillow.
+
+## Publishing
+
+The package name is `crewai-flowviz`.
+
+```bash
+rm -rf dist
+uv build
+uv publish
+```
+
+PyPI versions are immutable, so bump `version` in `pyproject.toml` before each release.

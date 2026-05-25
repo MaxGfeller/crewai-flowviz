@@ -3,9 +3,33 @@ name = "crewai-flowviz"
 version = "0.1.0"
 description = "Configurable static and interactive visualizations for CrewAI Flows"
 readme = "README.md"
-authors = [{ name = "Max Gfeller" }]
+authors = [{ name = "Max Gfeller", email = "mail@maxgfeller.com" }]
+license = "MIT"
 requires-python = ">=3.10,<3.14"
+keywords = ["crewai", "flows", "visualization", "diagrams", "svg", "png", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Framework :: Pydantic",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Documentation",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = ["pillow>=10.0"]
+
+[project.urls]
+Homepage = "https://github.com/MaxGfeller/crewai-flowviz"
+Repository = "https://github.com/MaxGfeller/crewai-flowviz"
+Issues = "https://github.com/MaxGfeller/crewai-flowviz/issues"
 
 [project.optional-dependencies]
 crewai = ["crewai>=1.9"]
