@@ -39,11 +39,6 @@ uvx --from crewai-flowviz --with crewai crewai-flowviz render \
 
 ## Local Development
 
-```bash
-uv python pin 3.13
-rm -rf .venv
-```
-
 Run the included example:
 
 ```bash
