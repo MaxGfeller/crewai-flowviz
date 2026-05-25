@@ -123,24 +123,260 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
   <style>
     :root {{
       color-scheme: light dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #111418;
-      color: #eef2f5;
+      --ink: #171b1e;
+      --panel: #f5f2eb;
+      --panel-2: #ebe6dc;
+      --line: #d3ccc0;
+      --muted: #736d63;
+      --text: #201f1b;
+      --field: #fffcf5;
+      --accent: #ef5b4e;
+      --accent-2: #1e8f84;
+      --dark: #222a2a;
+      --dark-2: #182020;
+      --dark-line: #354141;
+      --canvas: #242927;
+      font-family: "Avenir Next", Avenir, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+      background: var(--ink);
+      color: var(--text);
     }}
     html, body {{ height: 100%; }}
-    body {{ margin: 0; height: 100vh; overflow: hidden; display: grid; grid-template-columns: 320px minmax(0, 1fr); }}
-    aside {{ height: 100vh; box-sizing: border-box; border-right: 1px solid #2a323a; padding: 18px; background: #151a20; overflow: auto; }}
-    main {{ height: 100vh; min-width: 0; min-height: 0; overflow: auto; background: #20262c; }}
-    h1 {{ font-size: 18px; line-height: 1.25; margin: 0 0 18px; }}
-    label {{ display: grid; gap: 6px; font-size: 12px; color: #aeb8c2; margin: 0 0 14px; }}
-    input, select {{ border: 1px solid #3a4650; border-radius: 6px; background: #0f1318; color: #eef2f5; padding: 8px 9px; font: inherit; }}
-    input[type="checkbox"] {{ width: 18px; height: 18px; }}
-    .check {{ display: flex; align-items: center; gap: 9px; margin-bottom: 12px; color: #d8e0e7; font-size: 13px; }}
-    .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-    .buttons {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }}
-    button, a.button {{ border: 0; border-radius: 6px; background: #ff665c; color: white; padding: 9px 11px; text-decoration: none; font-weight: 700; cursor: pointer; }}
-    a.button.secondary {{ background: #33404b; }}
-    #canvas {{ width: max-content; min-width: 100%; min-height: 100%; display: grid; place-items: start center; padding: 24px; box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      background:
+        radial-gradient(circle at 0 0, rgba(239,91,78,.18), transparent 30%),
+        linear-gradient(120deg, var(--dark), var(--dark-2));
+    }}
+    aside {{
+      height: 100vh;
+      box-sizing: border-box;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 18px 0 50px rgba(0,0,0,.18);
+      min-width: 0;
+    }}
+    main {{
+      height: 100vh;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      background: var(--canvas);
+    }}
+    h1 {{
+      font-size: 20px;
+      line-height: 1.16;
+      letter-spacing: 0;
+      margin: 0;
+      color: var(--text);
+    }}
+    label {{ margin: 0; }}
+    input, select {{
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--field);
+      color: var(--text);
+      padding: 8px 9px;
+      font: inherit;
+      min-height: 36px;
+    }}
+    select {{
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position: calc(100% - 16px) 15px, calc(100% - 11px) 15px;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 32px;
+    }}
+    input:focus, select:focus, button:focus-visible, a.button:focus-visible {{
+      outline: 2px solid rgba(239,91,78,.35);
+      outline-offset: 2px;
+    }}
+    input[type="checkbox"] {{
+      appearance: none;
+      width: 34px;
+      min-width: 34px;
+      height: 20px;
+      min-height: 20px;
+      border-radius: 999px;
+      padding: 0;
+      background: #d8d1c6;
+      position: relative;
+      cursor: pointer;
+      transition: background .16s ease;
+    }}
+    input[type="checkbox"]::after {{
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 2px;
+      top: 2px;
+      border-radius: 999px;
+      background: #fffaf1;
+      box-shadow: 0 1px 2px rgba(0,0,0,.22);
+      transition: transform .16s ease;
+    }}
+    input[type="checkbox"]:checked {{ background: var(--accent-2); }}
+    input[type="checkbox"]:checked::after {{ transform: translateX(14px); }}
+    input[type="range"] {{
+      padding: 0;
+      border: 0;
+      min-height: 20px;
+      accent-color: var(--accent);
+      background: transparent;
+    }}
+    .sidebar-head {{
+      padding: 22px 20px 18px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #fffaf1, var(--panel));
+    }}
+    .meta {{
+      display: flex;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 10px;
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    }}
+    .meta span {{
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 7px;
+      background: rgba(255,255,255,.36);
+    }}
+    .controls {{
+      overflow: auto;
+      padding: 4px 20px 22px;
+    }}
+    .section {{
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+    }}
+    .section:last-child {{ border-bottom: 0; }}
+    .section-title {{
+      margin: 0 0 12px;
+      font-size: 11px;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      color: var(--muted);
+      font-weight: 800;
+    }}
+    .control {{
+      display: grid;
+      gap: 7px;
+      margin-bottom: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+    }}
+    .section > .control:last-child {{ margin-bottom: 0; }}
+    .row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }}
+    .row .control {{ margin-bottom: 0; align-self: start; }}
+    .range-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }}
+    .value-pill {{
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      color: var(--text);
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.42);
+      border-radius: 999px;
+      padding: 3px 7px;
+      min-width: 34px;
+      text-align: center;
+    }}
+    .check {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 0;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }}
+    .actions {{
+      border-top: 1px solid var(--line);
+      padding: 14px 20px 18px;
+      background: rgba(235,230,220,.92);
+      backdrop-filter: blur(10px);
+    }}
+    .buttons {{ display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }}
+    button, a.button {{
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: var(--accent);
+      color: white;
+      padding: 10px 11px;
+      text-decoration: none;
+      font-weight: 800;
+      cursor: pointer;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.1;
+    }}
+    a.button.secondary {{
+      background: var(--dark);
+      border-color: rgba(255,255,255,.08);
+    }}
+    button:hover, a.button:hover {{ filter: brightness(1.06); }}
+    .stagebar {{
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--dark-line);
+      background: rgba(24,32,32,.93);
+      color: #f4eee5;
+    }}
+    .stage-title {{
+      font-weight: 800;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }}
+    #status {{
+      font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+      color: #b8c9c7;
+      font-size: 12px;
+      white-space: nowrap;
+    }}
+    .viewport {{
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+      background:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+        var(--canvas);
+      background-size: 28px 28px;
+    }}
+    #canvas {{
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      display: grid;
+      place-items: start center;
+      padding: 32px;
+      box-sizing: border-box;
+    }}
     #canvas svg {{
       max-width: none;
       background-color: white;
@@ -151,36 +387,65 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
         linear-gradient(-45deg, transparent 75%, rgba(0,0,0,.08) 75%);
       background-position: 0 0, 0 8px, 8px -8px, -8px 0;
       background-size: 16px 16px;
-      box-shadow: 0 20px 70px rgba(0,0,0,.35);
+      box-shadow: 0 18px 56px rgba(0,0,0,.42);
+      border-radius: 2px;
     }}
-    .meta {{ color: #7f8a94; font-size: 12px; margin-bottom: 18px; }}
+    @media (max-width: 840px) {{
+      body {{ grid-template-columns: 1fr; grid-template-rows: minmax(280px, 42vh) minmax(0, 1fr); }}
+      aside {{ height: auto; min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }}
+      main {{ height: auto; min-height: 0; }}
+      .buttons {{ grid-template-columns: 1fr 1fr; }}
+    }}
   </style>
 </head>
 <body>
   <aside>
-    <h1>{graph.name}</h1>
-    <div class="meta">{len(graph.nodes)} nodes · {len(graph.edges)} edges</div>
-    <label>Theme<select id="theme">{theme_options}</select></label>
-    <label>Direction<select id="direction">{direction_options}</select></label>
-    <div class="row">
-      <label>Width<input id="width" type="number" min="320" value="{config.width or ""}" placeholder="auto"></label>
-      <label>Height<input id="height" type="number" min="240" value="{config.height or ""}" placeholder="auto"></label>
+    <div class="sidebar-head">
+      <h1>{graph.name}</h1>
+      <div class="meta"><span>{len(graph.nodes)} nodes</span><span>{len(graph.edges)} edges</span></div>
     </div>
-    <label>Node width<input id="node_width" type="range" min="180" max="420" value="{config.node_width}"><span id="node_width_value"></span></label>
-    <label>Rank gap<input id="rank_gap" type="range" min="70" max="240" value="{config.rank_gap}"><span id="rank_gap_value"></span></label>
-    <label>Node gap<input id="node_gap" type="range" min="24" max="160" value="{config.node_gap}"><span id="node_gap_value"></span></label>
-    <label>Margin<input id="margin" type="range" min="20" max="120" value="{config.margin}"><span id="margin_value"></span></label>
-    <label class="check"><input id="grid" type="checkbox" checked> Grid</label>
-    <label class="check"><input id="labels" type="checkbox" checked> Edge labels</label>
-    <label class="check"><input id="sources" type="checkbox"> Source refs</label>
-    <label class="check"><input id="background" type="checkbox" checked> Export background color</label>
-    <div class="buttons">
-      <button id="refresh">Refresh</button>
+    <div class="controls">
+      <section class="section">
+        <h2 class="section-title">Appearance</h2>
+        <label class="control">Theme<select id="theme">{theme_options}</select></label>
+        <label class="control">Direction<select id="direction">{direction_options}</select></label>
+      </section>
+      <section class="section">
+        <h2 class="section-title">Frame</h2>
+        <div class="row">
+          <label class="control">Width<input id="width" type="number" min="320" value="{config.width or ""}" placeholder="auto"></label>
+          <label class="control">Height<input id="height" type="number" min="240" value="{config.height or ""}" placeholder="auto"></label>
+        </div>
+      </section>
+      <section class="section">
+        <h2 class="section-title">Spacing</h2>
+        <label class="control"><span class="range-head">Node width<span class="value-pill" id="node_width_value"></span></span><input id="node_width" type="range" min="180" max="420" value="{config.node_width}"></label>
+        <label class="control"><span class="range-head">Rank gap<span class="value-pill" id="rank_gap_value"></span></span><input id="rank_gap" type="range" min="70" max="240" value="{config.rank_gap}"></label>
+        <label class="control"><span class="range-head">Node gap<span class="value-pill" id="node_gap_value"></span></span><input id="node_gap" type="range" min="24" max="160" value="{config.node_gap}"></label>
+        <label class="control"><span class="range-head">Margin<span class="value-pill" id="margin_value"></span></span><input id="margin" type="range" min="20" max="120" value="{config.margin}"></label>
+      </section>
+      <section class="section">
+        <h2 class="section-title">Layers</h2>
+        <label class="check"><span>Grid</span><input id="grid" type="checkbox" checked></label>
+        <label class="check"><span>Edge labels</span><input id="labels" type="checkbox" checked></label>
+        <label class="check"><span>Source refs</span><input id="sources" type="checkbox"></label>
+        <label class="check"><span>Export background color</span><input id="background" type="checkbox" checked></label>
+      </section>
+    </div>
+    <div class="actions">
+      <div class="buttons">
       <a class="button secondary" id="download" href="/download.svg">Download SVG</a>
       <a class="button secondary" id="download-png" href="/download.png">Download PNG</a>
+      </div>
     </div>
   </aside>
-  <main><div id="canvas"></div></main>
+  <main>
+    <header class="stagebar">
+      <div class="stage-title">{graph.name}</div>
+      <div id="status">Rendering</div>
+    </header>
+    <section class="viewport"><div id="canvas"></div></section>
+  </main>
   <script>
     const ids = ["theme","direction","width","height","node_width","rank_gap","node_gap","margin","grid","labels","sources","background"];
     const sliderIds = ["node_width","rank_gap","node_gap","margin"];
@@ -197,12 +462,14 @@ def _studio_html(graph: FlowGraph, config: RenderConfig) -> str:
       for (const id of sliderIds) document.getElementById(id + "_value").textContent = document.getElementById(id).value;
       const q = params();
       const res = await fetch("/svg?" + q);
-      document.getElementById("canvas").innerHTML = await res.text();
+      const svgText = await res.text();
+      document.getElementById("canvas").innerHTML = svgText;
+      const svg = document.querySelector("#canvas svg");
+      if (svg) document.getElementById("status").textContent = `${{svg.getAttribute("width")}} x ${{svg.getAttribute("height")}}`;
       document.getElementById("download").href = "/download.svg?" + q;
       document.getElementById("download-png").href = "/download.png?" + q;
     }}
     for (const id of ids) document.getElementById(id).addEventListener("input", refresh);
-    document.getElementById("refresh").addEventListener("click", refresh);
     refresh();
   </script>
 </body>
