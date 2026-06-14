@@ -74,6 +74,7 @@ def _render_args(parser: argparse.ArgumentParser, *, output: bool = True) -> Non
     parser.add_argument("--node-width", type=int, default=None)
     parser.add_argument("--rank-gap", type=int, default=None)
     parser.add_argument("--node-gap", type=int, default=None)
+    parser.add_argument("--max-rank-nodes-per-row", type=int, default=None)
     parser.add_argument("--margin", type=int, default=None)
     parser.add_argument("--title", default=None)
     parser.add_argument("--no-grid", action="store_true")
@@ -107,6 +108,7 @@ def _config(args: argparse.Namespace) -> tuple[RenderConfig, dict[str, object]]:
         ("node_width", "node_width"),
         ("rank_gap", "rank_gap"),
         ("node_gap", "node_gap"),
+        ("max_rank_nodes_per_row", "max_rank_nodes_per_row"),
         ("margin", "margin"),
         ("title", "title"),
     ]:

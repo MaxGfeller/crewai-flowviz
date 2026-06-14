@@ -106,6 +106,7 @@ class RenderConfig:
     min_node_height: int = 74
     rank_gap: int = 124
     node_gap: int = 56
+    max_rank_nodes_per_row: int | None = None
     font_family: str = "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
     mono_family: str = "JetBrains Mono, SFMono-Regular, Consolas, Liberation Mono, monospace"
     font_size: int = 15

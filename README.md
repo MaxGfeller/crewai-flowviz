@@ -72,6 +72,7 @@ width = 1600
 node_width = 300
 rank_gap = 140
 node_gap = 70
+max_rank_nodes_per_row = 3
 title = "Support Flow"
 show_source_refs = true
 export_background = false

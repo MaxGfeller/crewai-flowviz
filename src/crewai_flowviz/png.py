@@ -11,6 +11,7 @@ from PIL import Image, ImageColor, ImageDraw, ImageFont
 
 from crewai_flowviz.layout import GraphLayout, LayoutNode, layout_graph
 from crewai_flowviz.models import Edge, FlowGraph, RenderConfig, Theme
+from crewai_flowviz.routing import back_edge_route, back_edge_side, regular_edge_points
 
 
 def render_png_bytes(graph: FlowGraph, config: RenderConfig, theme: Theme) -> bytes:
@@ -126,13 +127,21 @@ def _draw_edges(
         for edge in edges:
             grouped_and_ids.add((edge.source, edge.target, edge.label))
 
-    back_lane = 0
+    back_lane_seed = 0
+    back_lanes: dict[tuple[str, str], int] = defaultdict(int)
     for edge in graph.edges:
         if (edge.source, edge.target, edge.label) in grouped_and_ids:
             continue
         if edge.back:
-            _draw_back_edge(draw, edge, layout, config, theme, fonts, back_lane, labels_only=labels_only)
-            back_lane += 1
+            lane = back_lane_seed
+            side = None
+            if edge.source in layout.nodes and edge.target in layout.nodes:
+                side = back_edge_side(layout.nodes[edge.source], layout.nodes[edge.target], config, lane=back_lane_seed)
+                lane_key = (edge.source, side)
+                lane = back_lanes[lane_key]
+                back_lanes[lane_key] += 1
+            _draw_back_edge(draw, edge, layout, config, theme, fonts, lane, side=side, labels_only=labels_only)
+            back_lane_seed += 1
         else:
             _draw_regular_edge(draw, edge, layout, config, theme, fonts, labels_only=labels_only)
 
@@ -193,20 +202,8 @@ def _draw_regular_edge(
     target = layout.nodes[edge.target]
     color = _edge_color(edge, theme)
     dashed = edge.kind == "router"
-    if config.direction == "horizontal":
-        start = _right(source)
-        end = _left(target)
-        mid_x = (start[0] + end[0]) / 2
-        if target.rank <= source.rank:
-            mid_x = max(source.x, target.x) + source.width / 2 + config.node_gap
-        points = [start, (mid_x, start[1]), (mid_x, end[1]), end]
-    else:
-        start = _bottom(source)
-        end = _top(target)
-        mid_y = (start[1] + end[1]) / 2
-        if target.rank <= source.rank:
-            mid_y = max(source.y, target.y) + source.height / 2 + config.node_gap
-        points = [start, (start[0], mid_y), (end[0], mid_y), end]
+    avoid_collisions = edge.kind != "router" or target.rank > source.rank + 1
+    points = regular_edge_points(source, target, layout, config, avoid_collisions=avoid_collisions)
 
     if not labels_only:
         _draw_arrow_line(draw, points, color, 2, dashed=dashed)
@@ -223,6 +220,7 @@ def _draw_back_edge(
     theme: Theme,
     fonts: dict[str, ImageFont.ImageFont],
     lane: int,
+    side: str | None,
     *,
     labels_only: bool,
 ) -> None:
@@ -231,20 +229,15 @@ def _draw_back_edge(
     source = layout.nodes[edge.source]
     target = layout.nodes[edge.target]
     color = _color(theme.edge_back)
-    if config.direction == "horizontal":
-        max_bottom = max(source.y + source.height / 2, target.y + target.height / 2)
-        side_y = max(layout.height - config.margin * 0.55 - lane * 22, max_bottom + 28)
-        points = [_bottom(source), (source.x, side_y), (target.x, side_y), _bottom(target)]
-        label_at = (target.x, target.y + target.height / 2 + 28)
-    else:
-        max_right = max(source.x + source.width / 2, target.x + target.width / 2)
-        side_x = max(layout.width - config.margin * 0.55 - lane * 22, max_right + 28)
-        points = [_right(source), (side_x, source.y), (side_x, target.y), _right(target)]
-        label_w, label_h = _edge_label_size(draw, edge.label, config, fonts)
-        label_at = (
-            layout.width - config.margin * 0.65 - label_w / 2,
-            target.y - target.height / 2 - 14 - lane * (label_h + 5),
-        )
+    points, label_at = back_edge_route(
+        source,
+        target,
+        layout,
+        config,
+        lane=lane,
+        label_size=_edge_label_size(draw, edge.label, config, fonts),
+        side=side,
+    )
 
     if not labels_only:
         _draw_arrow_line(draw, points, color, 2, dashed=True)

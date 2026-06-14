@@ -8,6 +8,7 @@ from math import ceil
 
 from crewai_flowviz.layout import GraphLayout, LayoutNode, layout_graph
 from crewai_flowviz.models import Edge, FlowGraph, RenderConfig, Theme
+from crewai_flowviz.routing import back_edge_route, back_edge_side, regular_edge_points
 from crewai_flowviz.themes import get_theme
 
 
@@ -126,13 +127,21 @@ def _edges(
             for edge in edges:
                 grouped_and_ids.add((edge.source, edge.target, edge.label))
 
-    back_lane = 0
+    back_lane_seed = 0
+    back_lanes: dict[tuple[str, str], int] = defaultdict(int)
     for edge in graph.edges:
         if (edge.source, edge.target, edge.label) in grouped_and_ids:
             continue
         if edge.back:
-            parts.append(_back_edge(edge, layout, config, theme, back_lane, labels_only=labels_only))
-            back_lane += 1
+            lane = back_lane_seed
+            side = None
+            if edge.source in layout.nodes and edge.target in layout.nodes:
+                side = back_edge_side(layout.nodes[edge.source], layout.nodes[edge.target], config, lane=back_lane_seed)
+                lane_key = (edge.source, side)
+                lane = back_lanes[lane_key]
+                back_lanes[lane_key] += 1
+            parts.append(_back_edge(edge, layout, config, theme, lane, side=side, labels_only=labels_only))
+            back_lane_seed += 1
         else:
             parts.append(_regular_edge(edge, layout, config, theme, labels_only=labels_only))
     parts.append("</g>")
@@ -204,20 +213,8 @@ def _regular_edge(
     source = layout.nodes[edge.source]
     target = layout.nodes[edge.target]
     color, marker, dash, width = _edge_style(edge, theme)
-    if config.direction == "horizontal":
-        start = _right(source)
-        end = _left(target)
-        mid_x = (start[0] + end[0]) / 2
-        if target.rank <= source.rank:
-            mid_x = max(source.x, target.x) + source.width / 2 + config.node_gap
-        points = [start, (mid_x, start[1]), (mid_x, end[1]), end]
-    else:
-        start = _bottom(source)
-        end = _top(target)
-        mid_y = (start[1] + end[1]) / 2
-        if target.rank <= source.rank:
-            mid_y = max(source.y, target.y) + source.height / 2 + config.node_gap
-        points = [start, (start[0], mid_y), (end[0], mid_y), end]
+    avoid_collisions = edge.kind != "router" or target.rank > source.rank + 1
+    points = regular_edge_points(source, target, layout, config, avoid_collisions=avoid_collisions)
     label_at = _router_label_position(edge, target, points, config) if edge.kind == "router" else _midpoint(points)
     path = _path(points)
     parts = []
@@ -237,6 +234,7 @@ def _back_edge(
     config: RenderConfig,
     theme: Theme,
     lane: int,
+    side: str | None,
     *,
     labels_only: bool,
 ) -> str:
@@ -244,27 +242,15 @@ def _back_edge(
         return ""
     source = layout.nodes[edge.source]
     target = layout.nodes[edge.target]
-    offset = 48 + lane * 24
-    if config.direction == "horizontal":
-        max_bottom = max(source.y + source.height / 2, target.y + target.height / 2)
-        side_y = layout.height - config.margin * 0.55 - lane * 22
-        side_y = max(side_y, max_bottom + 28)
-        start = _bottom(source)
-        end = _bottom(target)
-        points = [start, (start[0], side_y), (end[0], side_y), end]
-        label_at = (target.x, target.y + target.height / 2 + 28)
-    else:
-        max_right = max(source.x + source.width / 2, target.x + target.width / 2)
-        side_x = layout.width - config.margin * 0.55 - lane * 22
-        side_x = max(side_x, max_right + 28)
-        start = _right(source)
-        end = _right(target)
-        points = [start, (side_x, start[1]), (side_x, end[1]), end]
-        label_w, label_h = _edge_label_size(edge.label, config)
-        label_at = (
-            layout.width - config.margin * 0.65 - label_w / 2,
-            target.y - target.height / 2 - 14 - lane * (label_h + 5),
-        )
+    points, label_at = back_edge_route(
+        source,
+        target,
+        layout,
+        config,
+        lane=lane,
+        label_size=_edge_label_size(edge.label, config),
+        side=side,
+    )
     parts = []
     if not labels_only:
         parts.append(

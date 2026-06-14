@@ -207,12 +207,24 @@ def _place_vertical(
     title_height = 48 if config.title else 0
     rank_widths = []
     rank_heights = []
+    rank_rows: dict[int, list[list[str]]] = {}
+    rank_row_heights: dict[int, list[float]] = {}
     for rank in groups:
-        nodes = groups[rank]
-        rank_width = sum(measured[node_id][0] for node_id in nodes)
-        rank_width += max(0, len(nodes) - 1) * config.node_gap
+        rows = _split_vertical_rank(groups[rank], config.max_rank_nodes_per_row)
+        rank_rows[rank] = rows
+        row_widths = []
+        row_heights = []
+        for nodes in rows:
+            row_width = sum(measured[node_id][0] for node_id in nodes)
+            row_width += max(0, len(nodes) - 1) * config.node_gap
+            row_widths.append(row_width)
+            row_heights.append(max(measured[node_id][1] for node_id in nodes))
+        rank_width = max(row_widths, default=0)
+        rank_height = sum(row_heights)
+        rank_height += max(0, len(row_heights) - 1) * _vertical_rank_row_gap(config)
         rank_widths.append(rank_width)
-        rank_heights.append(max(measured[node_id][1] for node_id in nodes))
+        rank_heights.append(rank_height)
+        rank_row_heights[rank] = row_heights
 
     back_edge_pad = 0 if back_edge_count == 0 else 90 + min(back_edge_count, 8) * 22
     width = max(rank_widths, default=0) + config.margin * 2 + back_edge_pad
@@ -228,34 +240,89 @@ def _place_vertical(
     nodes_out: dict[str, LayoutNode] = {}
     y = config.margin + title_height
     for rank_index, rank in enumerate(groups):
-        nodes = groups[rank]
-        row_height = rank_heights[rank_index]
-        centers = _vertical_row_centers(
-            nodes,
-            measured,
-            nodes_out,
-            incoming,
-            rank_by_node,
-            rank,
-            width,
-            back_edge_pad,
-            config,
-        )
-        for node_id, center_x in zip(nodes, centers):
-            node_width, node_height, lines, source_ref = measured[node_id]
-            nodes_out[node_id] = LayoutNode(
-                id=node_id,
-                rank=rank,
-                x=center_x,
-                y=y + row_height / 2,
-                width=node_width,
-                height=node_height,
-                label_lines=lines,
-                source_ref=source_ref,
-            )
-        y += row_height + config.rank_gap
+        row_y = y
+        rows = rank_rows[rank]
+        for row_index, (nodes, row_height) in enumerate(zip(rows, rank_row_heights[rank])):
+            if len(rows) > 1:
+                centers = _vertical_wrapped_row_centers(
+                    nodes,
+                    measured,
+                    width,
+                    back_edge_pad,
+                    rank_widths[rank_index],
+                    row_index,
+                    len(rows),
+                    config,
+                )
+            else:
+                centers = _vertical_row_centers(
+                    nodes,
+                    measured,
+                    nodes_out,
+                    incoming,
+                    rank_by_node,
+                    rank,
+                    width,
+                    back_edge_pad,
+                    config,
+                )
+            for node_id, center_x in zip(nodes, centers):
+                node_width, node_height, lines, source_ref = measured[node_id]
+                nodes_out[node_id] = LayoutNode(
+                    id=node_id,
+                    rank=rank,
+                    x=center_x,
+                    y=row_y + row_height / 2,
+                    width=node_width,
+                    height=node_height,
+                    label_lines=lines,
+                    source_ref=source_ref,
+                )
+            row_y += row_height + _vertical_rank_row_gap(config)
+        y += rank_heights[rank_index] + config.rank_gap
 
     return GraphLayout(nodes=nodes_out, ranks=groups, width=width, height=height, title_height=title_height)
+
+
+def _split_vertical_rank(node_ids: list[str], max_nodes_per_row: int | None) -> list[list[str]]:
+    if not max_nodes_per_row or max_nodes_per_row < 1 or len(node_ids) <= max_nodes_per_row:
+        return [node_ids]
+
+    return [node_ids[index : index + max_nodes_per_row] for index in range(0, len(node_ids), max_nodes_per_row)]
+
+
+def _vertical_rank_row_gap(config: RenderConfig) -> float:
+    return float(max(config.node_gap, config.edge_font_size * 3 + 12))
+
+
+def _vertical_wrapped_row_centers(
+    node_ids: list[str],
+    measured: dict[str, tuple[float, float, list[str], str | None]],
+    width: float,
+    back_edge_pad: float,
+    rank_width: float,
+    row_index: int,
+    row_count: int,
+    config: RenderConfig,
+) -> list[float]:
+    widths = [measured[node_id][0] for node_id in node_ids]
+    row_width = sum(widths) + max(0, len(widths) - 1) * config.node_gap
+    usable_left = float(config.margin)
+    usable_right = float(width - config.margin - back_edge_pad)
+    usable_center = (usable_left + usable_right) / 2
+    frame_width = min(rank_width, usable_right - usable_left)
+    frame_left = usable_center - frame_width / 2
+    spare = max(0.0, frame_width - row_width)
+    if row_count == 1:
+        offset = spare / 2
+    elif row_index == 0:
+        offset = 0.0
+    elif row_index == row_count - 1:
+        offset = spare
+    else:
+        offset = spare / 2
+    centers = _regular_centers(frame_left + offset, widths, config.node_gap)
+    return _fit_centers(centers, widths, usable_left, usable_right)
 
 
 def _vertical_row_centers(
