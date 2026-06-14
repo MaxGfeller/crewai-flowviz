@@ -31,6 +31,7 @@ def render_png_bytes(graph: FlowGraph, config: RenderConfig, theme: Theme) -> by
             fill=_color(theme.text),
         )
 
+    _draw_node_shadows(draw, graph, layout, config, theme)
     _draw_edges(draw, graph, layout, config, theme, fonts, labels_only=False)
     _draw_nodes(draw, graph, layout, config, theme, fonts)
     _draw_edges(draw, graph, layout, config, theme, fonts, labels_only=True)
@@ -89,7 +90,7 @@ def _fonts(config: RenderConfig) -> dict[str, ImageFont.ImageFont]:
         "label": load(config.font_size, bold=True),
         "small": load(config.small_font_size, bold=True),
         "source": load(config.small_font_size),
-        "edge": load(config.edge_font_size),
+        "edge": load(config.edge_font_size, bold=True),
     }
 
 
@@ -239,7 +240,11 @@ def _draw_back_edge(
         max_right = max(source.x + source.width / 2, target.x + target.width / 2)
         side_x = max(layout.width - config.margin * 0.55 - lane * 22, max_right + 28)
         points = [_right(source), (side_x, source.y), (side_x, target.y), _right(target)]
-        label_at = (target.x + target.width / 2 + 48, target.y - 8)
+        label_w, label_h = _edge_label_size(draw, edge.label, config, fonts)
+        label_at = (
+            layout.width - config.margin * 0.65 - label_w / 2,
+            target.y - target.height / 2 - 14 - lane * (label_h + 5),
+        )
 
     if not labels_only:
         _draw_arrow_line(draw, points, color, 2, dashed=True)
@@ -262,8 +267,6 @@ def _draw_nodes(
         x0 = item.x - item.width / 2
         y0 = item.y - item.height / 2
         rect = [x0, y0, x0 + item.width, y0 + item.height]
-        shadow = [rect[0] + 4, rect[1] + 5, rect[2] + 4, rect[3] + 5]
-        draw.rounded_rectangle(shadow, radius=config.corner_radius, fill=_color(theme.shadow))
         draw.rounded_rectangle(rect, radius=config.corner_radius, fill=_color(fill), outline=_color(border), width=3)
 
         if config.show_kinds:
@@ -277,6 +280,27 @@ def _draw_nodes(
             text_y += line_height
         if item.source_ref:
             _center_text(draw, item.source_ref, (item.x, y0 + item.height - 21), fonts["source"], _color(theme.muted_text))
+
+
+def _draw_node_shadows(
+    draw: ImageDraw.ImageDraw,
+    graph: FlowGraph,
+    layout: GraphLayout,
+    config: RenderConfig,
+    theme: Theme,
+) -> None:
+    color = _color(theme.shadow)
+    for node in graph.nodes:
+        item = layout.nodes.get(node.id)
+        if not item:
+            continue
+        x0 = item.x - item.width / 2 + 4
+        y0 = item.y - item.height / 2 + 5
+        draw.rounded_rectangle(
+            [x0, y0, x0 + item.width, y0 + item.height],
+            radius=config.corner_radius,
+            fill=color,
+        )
 
 
 def _draw_polyline(
@@ -358,9 +382,7 @@ def _draw_edge_label(
     fonts: dict[str, ImageFont.ImageFont],
 ) -> None:
     font = fonts["edge"]
-    bbox = draw.textbbox((0, 0), label, font=font)
-    width = max(30, bbox[2] - bbox[0] + 16)
-    height = config.edge_font_size + 10
+    width, height = _edge_label_size(draw, label, config, fonts)
     rect = [
         center[0] - width / 2,
         center[1] - height / 2,
@@ -369,6 +391,16 @@ def _draw_edge_label(
     ]
     draw.rounded_rectangle(rect, radius=6, fill=_color(theme.label_fill), outline=_color(theme.label_border), width=1)
     _center_text(draw, label, (center[0], center[1] - config.edge_font_size / 2 + 2), font, _color(theme.text))
+
+
+def _edge_label_size(
+    draw: ImageDraw.ImageDraw,
+    label: str,
+    config: RenderConfig,
+    fonts: dict[str, ImageFont.ImageFont],
+) -> tuple[float, float]:
+    bbox = draw.textbbox((0, 0), label, font=fonts["edge"])
+    return max(30, bbox[2] - bbox[0] + 18), config.edge_font_size + 12
 
 
 def _draw_badge(
@@ -387,8 +419,8 @@ def _draw_badge(
     bbox = draw.textbbox((0, 0), label, font=font)
     width = max(42, bbox[2] - bbox[0] + 14)
     height = config.small_font_size + 8
-    fill = (255, 255, 255, 62) if start else _color(theme.badge_fill)
-    text = _color(theme.start_text if start else theme.badge_text)
+    fill = (255, 255, 255, 224) if start else _color(theme.badge_fill)
+    text = _color(theme.start_border if start else theme.badge_text)
     draw.rounded_rectangle([x, y, x + width, y + height], radius=5, fill=fill)
     _center_text(draw, label, (x + width / 2, y + height / 2 - config.small_font_size / 2 + 2), font, text)
 
@@ -429,10 +461,13 @@ def _router_label_position(
 ) -> tuple[float, float]:
     end = points[-1]
     prev = points[-2] if len(points) > 1 else points[0]
+    label_h = config.edge_font_size + 12
+    label_w = max(30, len(edge.label) * config.edge_font_size * 0.58 + 18)
+    gap = max(26, config.edge_font_size * 1.4)
     if config.direction == "horizontal":
-        x = end[0] - 34 if prev[0] < end[0] else end[0] + 34
+        x = end[0] - label_w / 2 - gap if prev[0] < end[0] else end[0] + label_w / 2 + gap
         return x, target.y - target.height / 2 - 10
-    y = end[1] - 22 if prev[1] < end[1] else end[1] + 22
+    y = end[1] - label_h / 2 - gap if prev[1] < end[1] else end[1] + label_h / 2 + gap
     return target.x, y
 
 

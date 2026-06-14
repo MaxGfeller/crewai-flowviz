@@ -33,6 +33,7 @@ def render_svg(
         parts.append(_grid(layout, theme))
     if config.title:
         parts.append(_title(config.title, config, theme))
+    parts.append(_node_shadows(graph, layout, config, theme))
     parts.append(_edges(graph, layout, config, theme, labels_only=False))
     parts.append(_nodes(graph, layout, config, theme))
     parts.append(_edges(graph, layout, config, theme, labels_only=True))
@@ -259,7 +260,11 @@ def _back_edge(
         start = _right(source)
         end = _right(target)
         points = [start, (side_x, start[1]), (side_x, end[1]), end]
-        label_at = (target.x + target.width / 2 + 48, target.y - 8)
+        label_w, label_h = _edge_label_size(edge.label, config)
+        label_at = (
+            layout.width - config.margin * 0.65 - label_w / 2,
+            target.y - target.height / 2 - 14 - lane * (label_h + 5),
+        )
     parts = []
     if not labels_only:
         parts.append(
@@ -288,11 +293,29 @@ def _router_label_position(
 ) -> tuple[float, float]:
     end = points[-1]
     prev = points[-2] if len(points) > 1 else points[0]
+    label_w, label_h = _edge_label_size(edge.label, config)
+    gap = max(26, config.edge_font_size * 1.4)
     if config.direction == "horizontal":
-        x = end[0] - 34 if prev[0] < end[0] else end[0] + 34
+        x = end[0] - label_w / 2 - gap if prev[0] < end[0] else end[0] + label_w / 2 + gap
         return x, target.y - target.height / 2 - 10
-    y = end[1] - 22 if prev[1] < end[1] else end[1] + 22
+    y = end[1] - label_h / 2 - gap if prev[1] < end[1] else end[1] + label_h / 2 + gap
     return target.x, y
+
+
+def _node_shadows(graph: FlowGraph, layout: GraphLayout, config: RenderConfig, theme: Theme) -> str:
+    parts = ['<g>']
+    for node in graph.nodes:
+        item = layout.nodes.get(node.id)
+        if not item:
+            continue
+        x = item.x - item.width / 2 + 4
+        y = item.y - item.height / 2 + 5
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{item.width:.1f}" height="{item.height:.1f}" '
+            f'rx="{config.corner_radius}" fill="{theme.shadow}"/>'
+        )
+    parts.append("</g>")
+    return "\n".join(parts)
 
 
 def _nodes(graph: FlowGraph, layout: GraphLayout, config: RenderConfig, theme: Theme) -> str:
@@ -309,7 +332,7 @@ def _nodes(graph: FlowGraph, layout: GraphLayout, config: RenderConfig, theme: T
             parts.append(f"<title>{escape(node.id)} — {escape(ref)}</title>")
         parts.append(
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{item.width:.1f}" height="{item.height:.1f}" '
-            f'rx="{config.corner_radius}" fill="{fill}" stroke="{border}" stroke-width="2.6" filter="url(#node-shadow)"/>'
+            f'rx="{config.corner_radius}" fill="{fill}" stroke="{border}" stroke-width="2.6"/>'
         )
         if config.show_kinds:
             parts.append(_badge(node.kind.replace("_", " "), x + 14, y + 13, config, theme, start=node.kind == "start"))
@@ -345,8 +368,8 @@ def _badge(kind: str, x: float, y: float, config: RenderConfig, theme: Theme, *,
     label = kind.upper()
     width = max(42, len(label) * config.small_font_size * 0.62 + 14)
     height = config.small_font_size + 8
-    fill = "rgba(255,255,255,0.24)" if start else theme.badge_fill
-    text = theme.start_text if start else theme.badge_text
+    fill = "rgba(255,255,255,0.88)" if start else theme.badge_fill
+    text = theme.start_border if start else theme.badge_text
     return (
         f'<rect x="{x:.1f}" y="{y:.1f}" width="{width:.1f}" height="{height:.1f}" rx="5" fill="{fill}"/>'
         f'<text x="{x + width / 2:.1f}" y="{y + height - 7:.1f}" text-anchor="middle" '
@@ -355,15 +378,19 @@ def _badge(kind: str, x: float, y: float, config: RenderConfig, theme: Theme, *,
 
 
 def _edge_label(label: str, x: float, y: float, config: RenderConfig, theme: Theme) -> str:
-    width = max(30, len(label) * config.edge_font_size * 0.58 + 16)
-    height = config.edge_font_size + 10
+    width, height = _edge_label_size(label, config)
     return (
         f'<g><rect x="{x - width / 2:.1f}" y="{y - height / 2:.1f}" width="{width:.1f}" height="{height:.1f}" '
         f'rx="6" fill="{theme.label_fill}" stroke="{theme.label_border}" stroke-width="1"/>'
         f'<text x="{x:.1f}" y="{y + config.edge_font_size / 2 - 2:.1f}" text-anchor="middle" '
-        f'font-family="{escape(config.mono_family)}" font-size="{config.edge_font_size}" fill="{theme.text}">'
+        f'font-family="{escape(config.mono_family)}" font-size="{config.edge_font_size}" '
+        f'font-weight="650" fill="{theme.text}">'
         f'{escape(label)}</text></g>'
     )
+
+
+def _edge_label_size(label: str, config: RenderConfig) -> tuple[float, float]:
+    return max(30, len(label) * config.edge_font_size * 0.58 + 18), config.edge_font_size + 12
 
 
 def _path(points: list[tuple[float, float]]) -> str:

@@ -207,8 +207,25 @@ def _flatten_sources(value: Any) -> Iterable[str]:
 
 def _ordered_nodes(nodes: list[Node], flow: Any) -> list[Node]:
     methods = list(getattr(flow, "_methods", {}).keys())
-    order = {str(name): index for index, name in enumerate(methods)}
-    return sorted(nodes, key=lambda node: order.get(node.id, len(order)))
+    method_order = {str(name): index for index, name in enumerate(methods)}
+    fallback_order = {node.id: index for index, node in enumerate(nodes)}
+
+    source_files = [node.source_file for node in nodes if node.source_file]
+    primary_source_file = max(set(source_files), key=source_files.count) if source_files else None
+
+    def key(node: Node) -> tuple[int, str, int, int, int, str]:
+        has_primary_source = bool(node.source_file and node.source_file == primary_source_file)
+        has_source_line = node.source_line is not None
+        return (
+            0 if has_primary_source and has_source_line else 1,
+            node.source_file or "",
+            node.source_line if node.source_line is not None else 10**9,
+            method_order.get(node.id, len(method_order)),
+            fallback_order[node.id],
+            node.id,
+        )
+
+    return sorted(nodes, key=key)
 
 
 def _source_info(

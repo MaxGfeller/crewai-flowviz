@@ -38,7 +38,7 @@ def layout_graph(graph: FlowGraph, config: RenderConfig) -> GraphLayout:
 
     if config.direction == "horizontal":
         return _place_horizontal(rank_groups, measured, config, back_edge_count)
-    return _place_vertical(rank_groups, measured, config, back_edge_count)
+    return _place_vertical(graph, rank_groups, measured, config, back_edge_count)
 
 
 def _assign_ranks(graph: FlowGraph) -> dict[str, int]:
@@ -98,7 +98,7 @@ def _order_within_ranks(graph: FlowGraph, ranks: dict[str, int]) -> dict[int, li
             prior_order = _rank_order(groups)
             groups[rank].sort(
                 key=lambda node_id: (
-                    _avg_order(incoming[node_id], prior_order),
+                    _avg_order_key(incoming[node_id], prior_order, original[node_id]),
                     original[node_id],
                 )
             )
@@ -108,7 +108,7 @@ def _order_within_ranks(graph: FlowGraph, ranks: dict[str, int]) -> dict[int, li
             next_order = _rank_order(groups)
             groups[rank].sort(
                 key=lambda node_id: (
-                    _avg_order(outgoing[node_id], next_order),
+                    _avg_order_key(outgoing[node_id], next_order, original[node_id]),
                     original[node_id],
                 )
             )
@@ -124,11 +124,15 @@ def _rank_order(groups: dict[int, list[str]]) -> dict[str, int]:
     return order
 
 
-def _avg_order(node_ids: list[str], order: dict[str, int]) -> float:
+def _avg_order_key(
+    node_ids: list[str],
+    order: dict[str, int],
+    fallback: int,
+) -> tuple[int, float]:
     values = [order[node_id] for node_id in node_ids if node_id in order]
     if not values:
-        return 0
-    return mean(values)
+        return 1, float(fallback)
+    return 0, mean(values)
 
 
 def _measure_nodes(
@@ -194,6 +198,7 @@ def _wrap_label(text: str, max_chars: int) -> list[str]:
 
 
 def _place_vertical(
+    graph: FlowGraph,
     groups: dict[int, list[str]],
     measured: dict[str, tuple[float, float, list[str], str | None]],
     config: RenderConfig,
@@ -214,30 +219,126 @@ def _place_vertical(
     height = sum(rank_heights) + max(0, len(rank_heights) - 1) * config.rank_gap
     height += config.margin * 2 + title_height
 
+    rank_by_node = {node_id: rank for rank, node_ids in groups.items() for node_id in node_ids}
+    incoming: dict[str, list[str]] = defaultdict(list)
+    for edge in graph.edges:
+        if not edge.back:
+            incoming[edge.target].append(edge.source)
+
     nodes_out: dict[str, LayoutNode] = {}
     y = config.margin + title_height
     for rank_index, rank in enumerate(groups):
         nodes = groups[rank]
-        row_width = sum(measured[node_id][0] for node_id in nodes)
-        row_width += max(0, len(nodes) - 1) * config.node_gap
-        x = (width - row_width) / 2
         row_height = rank_heights[rank_index]
-        for node_id in nodes:
+        centers = _vertical_row_centers(
+            nodes,
+            measured,
+            nodes_out,
+            incoming,
+            rank_by_node,
+            rank,
+            width,
+            back_edge_pad,
+            config,
+        )
+        for node_id, center_x in zip(nodes, centers):
             node_width, node_height, lines, source_ref = measured[node_id]
             nodes_out[node_id] = LayoutNode(
                 id=node_id,
                 rank=rank,
-                x=x + node_width / 2,
+                x=center_x,
                 y=y + row_height / 2,
                 width=node_width,
                 height=node_height,
                 label_lines=lines,
                 source_ref=source_ref,
             )
-            x += node_width + config.node_gap
         y += row_height + config.rank_gap
 
     return GraphLayout(nodes=nodes_out, ranks=groups, width=width, height=height, title_height=title_height)
+
+
+def _vertical_row_centers(
+    node_ids: list[str],
+    measured: dict[str, tuple[float, float, list[str], str | None]],
+    placed: dict[str, LayoutNode],
+    incoming: dict[str, list[str]],
+    rank_by_node: dict[str, int],
+    rank: int,
+    width: float,
+    back_edge_pad: float,
+    config: RenderConfig,
+) -> list[float]:
+    widths = [measured[node_id][0] for node_id in node_ids]
+    row_width = sum(widths) + max(0, len(widths) - 1) * config.node_gap
+    usable_left = float(config.margin)
+    usable_right = float(width - config.margin - back_edge_pad)
+    usable_center = (usable_left + usable_right) / 2
+
+    desired: list[float | None] = []
+    for node_id in node_ids:
+        source_x = [
+            placed[source].x
+            for source in incoming.get(node_id, [])
+            if source in placed and rank_by_node.get(source, rank) < rank
+        ]
+        desired.append(mean(source_x) if source_x else None)
+
+    known = [value for value in desired if value is not None]
+    if known and max(known) - min(known) > row_width * 0.55:
+        fallback = _regular_centers(usable_center - row_width / 2, widths, config.node_gap)
+        targets = [value if value is not None else fallback[index] for index, value in enumerate(desired)]
+        return _spread_centers(targets, widths, config.node_gap, usable_left, usable_right)
+
+    center = mean(known) if known else usable_center
+    centers = _regular_centers(center - row_width / 2, widths, config.node_gap)
+    return _fit_centers(centers, widths, usable_left, usable_right)
+
+
+def _regular_centers(left: float, widths: list[float], gap: float) -> list[float]:
+    centers: list[float] = []
+    x = left
+    for width in widths:
+        centers.append(x + width / 2)
+        x += width + gap
+    return centers
+
+
+def _spread_centers(
+    desired: list[float],
+    widths: list[float],
+    gap: float,
+    left: float,
+    right: float,
+) -> list[float]:
+    centers = [
+        min(max(center, left + width / 2), right - width / 2)
+        for center, width in zip(desired, widths)
+    ]
+    for index in range(1, len(centers)):
+        min_center = centers[index - 1] + widths[index - 1] / 2 + gap + widths[index] / 2
+        centers[index] = max(centers[index], min_center)
+    for index in range(len(centers) - 2, -1, -1):
+        max_center = centers[index + 1] - widths[index + 1] / 2 - gap - widths[index] / 2
+        centers[index] = min(centers[index], max_center)
+    return _fit_centers(centers, widths, left, right)
+
+
+def _fit_centers(
+    centers: list[float],
+    widths: list[float],
+    left: float,
+    right: float,
+) -> list[float]:
+    if not centers:
+        return centers
+    left_overflow = left - (centers[0] - widths[0] / 2)
+    if left_overflow > 0:
+        centers = [center + left_overflow for center in centers]
+    right_overflow = centers[-1] + widths[-1] / 2 - right
+    if right_overflow > 0:
+        centers = [center - right_overflow for center in centers]
+    return centers
 
 
 def _place_horizontal(
