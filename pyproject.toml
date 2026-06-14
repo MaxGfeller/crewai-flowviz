@@ -1,6 +1,6 @@
 [project]
 name = "crewai-flowviz"
-version = "0.1.0"
+version = "0.1.1"
 description = "Configurable static and interactive visualizations for CrewAI Flows"
 readme = "README.md"
 authors = [{ name = "Max Gfeller", email = "mail@maxgfeller.com" }]
